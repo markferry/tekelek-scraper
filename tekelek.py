@@ -4,10 +4,10 @@ from collections import defaultdict
 from math import pi, trunc
 
 from paho.mqtt import publish
-import scrapy
 
 MQTTHOST = "localhost"
 TOPIC_ROOT = "ha"
+URL = "http://olive-hub/diag.htm"
 
 
 class OilTank:
@@ -69,9 +69,8 @@ class SensorData:
         assert trunc(c[0] & 0x7F) == self.raw["bat"]  # ??
 
 
-class Tekelek(scrapy.Spider):
+class Tekelek:
     name = "tekelek"
-    start_urls = ["http://olive-hub/diag.htm"]
     tanks = [
         RectTank("annex", length=150, width=110, height=81),
         VCylinder("main", height=130, radius=(160 / 2)),
@@ -96,8 +95,7 @@ class Tekelek(scrapy.Spider):
                 json_data.append((tank.name, json.dumps(self.value(tank, tek_data))))
         return json_data
 
-    def parse(self, response):
-        sensors = response.xpath("//table[2]//td[5]/text()").getall()
+    def publish(self, sensors):
         json_data = self.decode(sensors)
         for tank, data in json_data:
             publish.single(
