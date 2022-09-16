@@ -4,6 +4,7 @@ Scrape Tekelek 608A data to MQTT.
 
 Local settings are still hardcoded.
 
+***The decoding of data is totally wrong!***
 
 # Installation
 
