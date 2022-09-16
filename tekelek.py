@@ -1,6 +1,5 @@
 import json
 import re
-from collections import defaultdict
 from math import pi, trunc
 
 from paho.mqtt import publish
@@ -33,8 +32,11 @@ class RectTank(OilTank):
 
 
 class SensorData:
-    def __init__(self, s):
-        v = re.findall(r"\w+", s)
+    def __init__(self, row):
+        data = row[4]
+
+        v = re.findall(r"\w+", data)
+
         if len(v) == 6:
             raw = {
                 "data": int(v[0]),
@@ -46,14 +48,31 @@ class SensorData:
                     int(v[5], 16),
                 ),
             }
+            self.dev_id = int(row[0])
+            self.rf_addr = int(row[1])
+            self.rx_count = int(row[2])
+            self.rx_time = row[3]
             self.temperature = raw["data"] / 100
             self.depth = raw["aux"]
             self.battery_level = raw["bat"]
+
+            if len(row) >= 6:
+                self.fl = row[5]
+            else:
+                self.fl = ""
+
             self.raw = raw
+
             self.check()
         else:
+            self.dev_id = self.rf_addr = self.rx_count = self.rx_time = None
             self.depth = self.temperature = self.battery_level = None
-            self.raw = None
+            self.fl = self.raw = None
+
+        self.volume = None
+
+    def calc_volume(self, tank):
+        self.volume = tank.volume(self.depth)
 
     def check(self):
         """Check that raw values match cache"""
@@ -68,31 +87,25 @@ class SensorData:
         assert trunc(c[1] / 2) == self.raw["aux"]
         assert trunc(c[0] & 0x7F) == self.raw["bat"]  # ??
 
+    def __str__(self):
+        # return f"{self.dev_id}\t{self.rf_addr}\t{self.rx_count}\t{self.rx_time}\t{self.raw}"
+        return json.dumps(self.__dict__)
+
 
 class Tekelek:
     name = "tekelek"
     tanks = [
-        RectTank("annex", length=150, width=110, height=81),
         VCylinder("main", height=130, radius=(160 / 2)),
+        RectTank("annex", length=150, width=110, height=81),
     ]
-
-    @staticmethod
-    def value(tank, data):
-        if data.depth:
-            return {
-                "volume": tank.volume(data.depth),
-                "temperature": data.temperature,
-                "battery_level": data.battery_level,
-            }
-
-        return {"volume": None}
 
     def decode(self, sensors):
         json_data = []
         for idx, tank in enumerate(self.tanks):
             tek_data = SensorData(sensors[idx])
             if tek_data.depth:
-                json_data.append((tank.name, json.dumps(self.value(tank, tek_data))))
+                tek_data.calc_volume(tank)
+                json_data.append((tank.name, str(tek_data)))
         return json_data
 
     def publish(self, sensors):

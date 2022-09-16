@@ -2,13 +2,15 @@ import requests
 from bs4 import BeautifulSoup
 import tekelek
 
+
 def strain(soup):
-    return [
-        t.text for t in soup.select("table:nth-of-type(2) td:nth-of-type(5)")
-    ]
+    rows = soup.select("table:nth-of-type(2) tr")
+    return [[t.text for t in r.select("td")] for r in rows[1:]]
+
 
 def get(url):
     return requests.get(url)
+
 
 def run():
     tek = tekelek.Tekelek()
